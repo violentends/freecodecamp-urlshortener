@@ -45,6 +45,12 @@ app.post("/api/shorturl/new", function (req, res) {
   let urlObj
   try {
     urlObj = new URL(req.body.url);
+    if(urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+      res.json({
+        error: "invalid url",
+      });
+      return;
+    }
     url = urlObj.toString();
   } catch (error) {
     res.json({
@@ -89,6 +95,7 @@ app.get("/api/shorturl/:id", function (req, res) {
   db.get("select * from urls where id = ? ", [id], function (err, row) {
     if (err) {
       res.json({ error: "invalid url" });
+      return
     } else {
       res.redirect(row.url);
     }
