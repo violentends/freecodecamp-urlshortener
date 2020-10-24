@@ -4,15 +4,7 @@ var express = require("express");
 var bodyParser = require("body-parser");
 var sqlite3 = require("sqlite3");
 var dbFile = "./db.sqlite3";
-// const knex = require("knex");
-// const db = knex({
-//   client: "sqlite3",
-//   connection: {
-//     filename: "./db.sqlite3",
-//   },
-//   debug: true,
-//   useNullAsDefault: true,
-// });
+var dns = require("dns");
 
 var cors = require("cors");
 var app = express();
@@ -50,8 +42,9 @@ app.get("/api/hello", function (req, res) {
 
 app.post("/api/shorturl/new", function (req, res) {
   let url = "";
+  let urlObj
   try {
-    let urlObj = new URL(req.body.url);
+    urlObj = new URL(req.body.url);
     url = urlObj.toString();
   } catch (error) {
     res.json({
@@ -59,28 +52,35 @@ app.post("/api/shorturl/new", function (req, res) {
     });
     return;
   }
-  let db = new sqlite3.Database(dbFile);
-  db.run(
-    ` insert into urls (url)
+  dns.lookup(urlObj.hostname, (error) => {
+    if (error) {
+      console.log(error);
+      res.json({ error: "invalid url" });
+      return;
+    }
+    let db = new sqlite3.Database(dbFile);
+    db.run(
+      ` insert into urls (url)
   values (?);`,
-    [url],
-    function (err) {
+      [url],
+      function (err) {
+        if (err) {
+          console.log("error: ", err);
+          res.json({ error: "db error" });
+        }
+      }
+    );
+    db.get(`select * from urls where url = ?`, [url], function (err, row) {
       if (err) {
-        console.log("error: ", err);
         res.json({ error: "db error" });
       }
-    }
-  );
-  db.get(`select * from urls where url = ?`, [url], function (err, row) {
-    if (err) {
-      res.json({ error: "db error" });
-    }
-    res.json({
-      original_url: row.url,
-      short_url: row.id,
+      res.json({
+        original_url: row.url,
+        short_url: row.id,
+      });
     });
+    db.close();
   });
-  db.close();
 });
 
 app.get("/api/shorturl/:id", function (req, res) {
